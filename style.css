@@ -42,3 +42,5 @@ td .actions{justify-content:flex-end}
 .loginbox{padding:28px 22px}
 }
 @media print{.sidebar,.topbar,.btn,.tools,.actions{display:none!important}.main{margin:0;width:100%}.content{padding:0}.panel,.tablepanel,.stat{box-shadow:none}}
+
+[hidden]{display:none!important}.authtabs{display:flex;margin:0 0 18px;border-bottom:1px solid rgba(0,0,0,.12)}.authtabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:10px;font-weight:600;color:#8a7d85}.authtabs button.active{color:#6b4259;border-bottom-color:#6b4259}
