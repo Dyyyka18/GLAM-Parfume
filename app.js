@@ -1,4 +1,3 @@
-
 const LOGO='assets/logo.png';document.querySelectorAll('.logoimg').forEach(i=>i.src=LOGO);document.getElementById('favicon').href=LOGO;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -6,7 +5,7 @@ const D0=()=>new Date().toLocaleDateString('sv-SE');
 const code=x=>'BRG-'+String(x.id).padStart(3,'0');
 // ---- Supabase (isi URL & anon key di config.js) ----
 const CFG=window.GLAM_CONFIG||{};
-const sb=(window.supabase&&CFG.SUPABASE_URL&&!/YOUR/i.test(CFG.SUPABASE_URL))?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY):null;
+const sb=(window.supabase&&CFG.SUPABASE_URL&&!/YOUR/i.test(CFG.SUPABASE_URL))?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY,{auth:{storage:window.sessionStorage}}):null;
 // barang: s0=stok_awal, min=stok_minimum, stock=stok_saat_ini | tx: gabungan stok_masuk & stok_keluar
 let items=[],tx=[],KATID={},page='dashboard',editing=null,range='semua';
 const sum=(id,type)=>tx.filter(t=>t.item===id&&t.type===type).reduce((a,t)=>a+t.qty,0);
