@@ -6,7 +6,7 @@ const D0=()=>new Date().toLocaleDateString('sv-SE');
 const code=x=>'BRG-'+String(x.id).padStart(3,'0');
 // ---- Supabase (isi URL & anon key di config.js) ----
 const CFG=window.GLAM_CONFIG||{};
-const sb=(window.supabase&&CFG.SUPABASE_URL&&!/YOUR/i.test(CFG.SUPABASE_URL))?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY,{auth:{storage:window.sessionStorage}}):null;
+const sb=(window.supabase&&CFG.SUPABASE_URL&&!/YOUR/i.test(CFG.SUPABASE_URL))?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY):null;
 // barang: s0=stok_awal, min=stok_minimum, stock=stok_saat_ini | tx: gabungan stok_masuk & stok_keluar
 let items=[],tx=[],KATID={},page='dashboard',editing=null,range='semua';
 const sum=(id,type)=>tx.filter(t=>t.item===id&&t.type===type).reduce((a,t)=>a+t.qty,0);
@@ -19,7 +19,7 @@ async function loadAll(){
  items=b.map(r=>({id:r.id_barang,cat:kn[r.id_kategori],name:r.nama_barang,unit:r.satuan,s0:+r.stok_awal,stock:+r.stok_saat_ini,min:+r.stok_minimum,note:r.keterangan||''}));
  tx=[...m.map(r=>({id:r.id_stok_masuk,type:'masuk',date:r.tanggal,item:r.id_barang,qty:+r.jumlah,supplier:r.supplier||'',note:r.keterangan||''})),...o.map(r=>({id:r.id_stok_keluar,type:'keluar',date:r.tanggal,item:r.id_barang,qty:+r.jumlah,supplier:'',note:r.keterangan||''}))];
  return true}
-async function enter(){if(!await loadAll())return;let pr=CFG.TANPA_LOGIN?{}:await sb.from('users').select('nama').maybeSingle(),nm=(pr.data&&pr.data.nama)||'Pemilik Toko';$('userName').textContent=nm;$('userAvatar').textContent=nm.trim().charAt(0).toUpperCase()||'A';$('login').style.display='none';go('dashboard');if(!CFG.TANPA_LOGIN)toast('Berhasil masuk ke GLAM Parfume');setTimeout(showNotif,500)}
+async function enter(){if(!await loadAll())return;let pr=await sb.from('users').select('nama').maybeSingle(),nm=(pr.data&&pr.data.nama)||'Pemilik Toko';$('userName').textContent=nm;$('userAvatar').textContent=nm.trim().charAt(0).toUpperCase()||'A';$('login').style.display='none';go('dashboard');toast('Berhasil masuk ke GLAM Parfume');setTimeout(showNotif,500)}
 const rup=(n)=>Number(n).toLocaleString('id-ID');
 const today=()=>new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 document.getElementById('dateText').textContent=today();
@@ -30,11 +30,15 @@ document.getElementById('scrim').onclick=()=>document.getElementById('sidebar').
 function labelTables(){document.querySelectorAll('#content table').forEach(t=>{const h=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim());t.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(!td.classList.contains('empty'))td.setAttribute('data-label',h[i]||'')}))})}
 new MutationObserver(labelTables).observe(document.getElementById('content'),{childList:true,subtree:true});
 document.getElementById('mobilemenu').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
-document.getElementById('logout').onclick=async e=>{e.preventDefault();if(sb)await sb.auth.signOut();items=[];tx=[];$('password').value='';closeNotif();document.getElementById('login').style.display='flex'};
-// Login hanya dengan password; akun pemilik (email) ditetapkan di config.js
-$('loginBtn').onclick=async()=>{let p=$('password').value;if(!p){toast('Password wajib diisi');return}if(!sb){toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js terlebih dahulu',5000);return}
-let r=await sb.auth.signInWithPassword({email:CFG.OWNER_EMAIL,password:p});if(r.error){toast(/confirm/i.test(r.error.message)?'Akun belum dikonfirmasi di Supabase (aktifkan Auto Confirm).':'Password salah',4000);return}await enter()};
-$('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
+document.getElementById('logout').onclick=async e=>{e.preventDefault();if(sb)await sb.auth.signOut();items=[];tx=[];$('password').value='';$('password2').value='';closeNotif();document.getElementById('login').style.display='flex'};
+let mode='login';
+function setMode(m){mode=m;$('rowNama').hidden=$('rowPass2').hidden=m==='login';$('tabLogin').classList.toggle('active',m==='login');$('tabReg').classList.toggle('active',m==='reg');$('loginBtn').textContent=m==='login'?'Masuk ke Dashboard →':'Daftar & Masuk →';$('password').autocomplete=m==='login'?'current-password':'new-password'}
+$('tabLogin').onclick=()=>setMode('login');$('tabReg').onclick=()=>setMode('reg');
+$('loginBtn').onclick=async()=>{let u=$('username').value.trim(),p=$('password').value;if(!sb){toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js terlebih dahulu',5000);return}
+if(mode==='reg'){let n=$('regNama').value.trim();if(!n||!u||!p){toast('Nama, email, dan password wajib diisi');return}if(!/^\S+@\S+\.\S+$/.test(u)){toast('Format email tidak valid');return}if(p.length<6){toast('Password minimal 6 karakter');return}if(p!==$('password2').value){toast('Konfirmasi password tidak sama');return}
+let r=await sb.auth.signUp({email:u,password:p,options:{data:{nama:n}}});if(r.error){toast(/registered|exists/i.test(r.error.message)?'Email sudah terdaftar, silakan masuk':'Gagal mendaftar: '+r.error.message,5000);return}
+if(!r.data.session){toast('Pendaftaran berhasil. Cek email untuk konfirmasi, lalu masuk.',6000);setMode('login');return}await enter();return}
+if(!u||!p){toast('Email dan password wajib diisi');return}let r=await sb.auth.signInWithPassword({email:emailOf(u),password:p});if(r.error){toast(/confirm/i.test(r.error.message)?'Email belum dikonfirmasi. Cek kotak masuk email kamu.':'Login gagal: email atau password tidak sesuai',5000);return}await enter()};
 function toast(t,ms=2600){let el=document.getElementById('toast');el.textContent=t;el.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.display='none',ms)}
 function status(x){return x.stock<=x.min?'<span class="pill red">Stok Menipis</span>':'<span class="pill green">Aman</span>'}
 function itemRow(x){return `<tr><td><div class="itemcell"><div class="itemicon">${x.cat==='Bahan Baku'?'◈':x.cat==='Kemasan'?'▣':'✧'}</div><div><div class="itemname">${esc(x.name)}</div><div class="itemcode">${code(x)}</div></div></div></td><td>${x.cat}</td><td><b>${rup(x.stock)}</b> <span class="muted">${x.unit}</span></td><td>${rup(x.min)} ${x.unit}</td><td>${status(x)}</td><td><div class="actions"><button class="iconbtn" onclick="editItem(${x.id})">Edit</button><button class="iconbtn" onclick="deleteItem(${x.id})">Hapus</button></div></td></tr>`}
@@ -78,10 +82,6 @@ function updateBadge(){let n=low().length,b=document.getElementById('badge');b.t
 function showNotif(){let l=low();if(!l.length||page!=='dashboard')return;document.getElementById('notifTitle').textContent=l.length+' barang stok menipis';document.getElementById('notifText').textContent=l.map(x=>x.name).join(', ')+' perlu segera di-restock.';document.getElementById('notifcard').classList.add('show')}
 function closeNotif(){document.getElementById('notifcard').classList.remove('show')}
 function goLow(){closeNotif();go('dashboard');setTimeout(()=>{let el=document.getElementById('lowPanel');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}},50)}
-(async()=>{updateBadge();const NL=!!CFG.TANPA_LOGIN;
-if(NL){$('login').style.display='none';$('logout').style.display='none'}
-if(!sb){if(NL){$('login').style.display='flex';toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js',6000)}return}
-if(NL){await enter();return}
-let r=await sb.auth.getSession();if(r.data.session)await enter()})();
+(async()=>{updateBadge();if(!sb)return;let r=await sb.auth.getSession();if(r.data.session)await enter()})();
 
 function weekChart(){let d=[...Array(7)].map((_,k)=>{let t=new Date();t.setDate(t.getDate()-6+k);let s=t.toLocaleDateString('sv-SE'),f=y=>tx.filter(z=>z.date===s&&z.type===y).reduce((a,z)=>a+z.qty,0);return{n:['Min','Sen','Sel','Rab','Kam','Jum','Sab'][t.getDay()],i:f('masuk'),o:f('keluar')}}),mx=Math.max(1,...d.flatMap(z=>[z.i,z.o]));return d.map(z=>`<div class="barwrap"><div class="bars"><div class="bar" style="height:${z.i/mx*100}%" title="Masuk ${rup(z.i)}"></div><div class="bar alt" style="height:${z.o/mx*100}%" title="Keluar ${rup(z.o)}"></div></div><span class="barlabel">${z.n}</span></div>`).join('')}
