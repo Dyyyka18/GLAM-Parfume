@@ -1,4 +1,3 @@
-
 const LOGO='assets/logo.png';document.querySelectorAll('.logoimg').forEach(i=>i.src=LOGO);document.getElementById('favicon').href=LOGO;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -30,9 +29,10 @@ document.getElementById('scrim').onclick=()=>document.getElementById('sidebar').
 function labelTables(){document.querySelectorAll('#content table').forEach(t=>{const h=[...t.querySelectorAll('thead th')].map(x=>x.textContent.trim());t.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(!td.classList.contains('empty'))td.setAttribute('data-label',h[i]||'')}))})}
 new MutationObserver(labelTables).observe(document.getElementById('content'),{childList:true,subtree:true});
 document.getElementById('mobilemenu').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
-document.getElementById('logout').onclick=async e=>{e.preventDefault();if(sb)await sb.auth.signOut();items=[];tx=[];$('password').value='';closeNotif();document.getElementById('login').style.display='flex'};
+document.getElementById('logout').onclick=async e=>{e.preventDefault();if(sb)await sb.auth.signOut();items=[];tx=[];try{sessionStorage.removeItem('glamOpen')}catch(e){}$('password').value='';closeNotif();document.getElementById('login').style.display='flex'};
 // Login hanya dengan password; akun pemilik (email) ditetapkan di config.js
-$('loginBtn').onclick=async()=>{let p=$('password').value;if(!p){toast('Password wajib diisi');return}if(!sb){toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js terlebih dahulu',5000);return}
+$('loginBtn').onclick=async()=>{let p=$('password').value;if(!p){toast('Password wajib diisi');return}
+if(CFG.TANPA_LOGIN){if(p!==String(CFG.PASSWORD_AWAL)){toast('Password salah');return}if(!sb){toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js',5000);return}try{sessionStorage.setItem('glamOpen','1')}catch(e){}$('password').value='';await enter();return}if(!sb){toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js terlebih dahulu',5000);return}
 let r=await sb.auth.signInWithPassword({email:CFG.OWNER_EMAIL,password:p});if(r.error){toast(/confirm/i.test(r.error.message)?'Akun belum dikonfirmasi di Supabase (aktifkan Auto Confirm).':'Password salah',4000);return}await enter()};
 $('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
 function toast(t,ms=2600){let el=document.getElementById('toast');el.textContent=t;el.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.display='none',ms)}
@@ -78,10 +78,11 @@ function updateBadge(){let n=low().length,b=document.getElementById('badge');b.t
 function showNotif(){let l=low();if(!l.length||page!=='dashboard')return;document.getElementById('notifTitle').textContent=l.length+' barang stok menipis';document.getElementById('notifText').textContent=l.map(x=>x.name).join(', ')+' perlu segera di-restock.';document.getElementById('notifcard').classList.add('show')}
 function closeNotif(){document.getElementById('notifcard').classList.remove('show')}
 function goLow(){closeNotif();go('dashboard');setTimeout(()=>{let el=document.getElementById('lowPanel');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}},50)}
-(async()=>{updateBadge();const NL=!!CFG.TANPA_LOGIN;
-if(NL){$('login').style.display='none';$('logout').style.display='none'}
-if(!sb){if(NL){$('login').style.display='flex';toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js',6000)}return}
-if(NL){await enter();return}
+(async()=>{updateBadge();const NL=!!CFG.TANPA_LOGIN,GATE=NL&&!!CFG.PASSWORD_AWAL,terbuka=()=>{try{return sessionStorage.getItem('glamOpen')==='1'}catch(e){return false}};
+if(NL&&!GATE){$('login').style.display='none';$('logout').style.display='none'}
+if(NL&&GATE&&terbuka())$('login').style.display='none';
+if(!sb){toast('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di config.js',6000);$('login').style.display='flex';return}
+if(NL){if(!GATE||terbuka())await enter();return}
 let r=await sb.auth.getSession();if(r.data.session)await enter()})();
 
 function weekChart(){let d=[...Array(7)].map((_,k)=>{let t=new Date();t.setDate(t.getDate()-6+k);let s=t.toLocaleDateString('sv-SE'),f=y=>tx.filter(z=>z.date===s&&z.type===y).reduce((a,z)=>a+z.qty,0);return{n:['Min','Sen','Sel','Rab','Kam','Jum','Sab'][t.getDay()],i:f('masuk'),o:f('keluar')}}),mx=Math.max(1,...d.flatMap(z=>[z.i,z.o]));return d.map(z=>`<div class="barwrap"><div class="bars"><div class="bar" style="height:${z.i/mx*100}%" title="Masuk ${rup(z.i)}"></div><div class="bar alt" style="height:${z.o/mx*100}%" title="Keluar ${rup(z.o)}"></div></div><span class="barlabel">${z.n}</span></div>`).join('')}
